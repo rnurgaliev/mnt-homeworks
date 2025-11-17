@@ -1,6 +1,6 @@
 ## Задание 1
 
-[task1](image0.png)
+![task1](image0.png)
 
 ## Задание 2
 
