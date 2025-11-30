@@ -1,0 +1,94 @@
+services:
+  elasticsearch-hot:
+    image: elastic/elasticsearch:8.14.0
+    container_name: es-hot
+    environment:
+      - node.name=es-hot
+      - cluster.name=elk-cluster
+      - discovery.seed_hosts=es-hot,es-warm
+      - cluster.initial_master_nodes=es-hot,es-warm
+      - node.roles=master,data_content,data_hot
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "http.host=0.0.0.0"
+      - xpack.security.enabled=false
+    volumes:
+      - ./data:/usr/share/elasticsearch/data
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    networks:
+      - elk
+
+  elasticsearch-warm:
+    image: elastic/elasticsearch:8.14.0
+    container_name: es-warm
+    environment:
+      - node.name=es-warm
+      - cluster.name=elk-cluster
+      - discovery.seed_hosts=es-hot
+      - node.roles=data_warm
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - discovery.seed_hosts=es-hot,es-warm
+      - cluster.initial_master_nodes=es-hot,es-warm
+      - node.roles=master,data_warm
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - "http.host=0.0.0.0"
+    depends_on:
+      - elasticsearch-hot
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elk
+
+  kibana:
+    image: elastic/kibana:8.14.0
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_URL: http://es-hot:9200
+      ELASTICSEARCH_HOSTS: '["http://es-hot:9200","http://es-warm:9200"]'
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch-hot
+    networks:
+      - elk
+
+  logstash:
+    image: elastic/logstash:8.14.0
+    container_name: logstash
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5000:5000/tcp"
+    environment:
+      - xpack.security.enabled=false
+    depends_on:
+      - elasticsearch-hot
+    networks:
+      - elk
+
+  filebeat:
+    image: elastic/filebeat:8.14.0
+    container_name: filebeat
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
+    depends_on:
+      - logstash
+    networks:
+      - elk
+
+networks:
+  elk:
+    driver: bridge
