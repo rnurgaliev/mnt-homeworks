@@ -11,4 +11,4 @@
 ## Задание 2
 
 ![task2](image2.png)
-![task2](image3z.png)
+![task2](image3.png)
